@@ -203,6 +203,8 @@ XML;
     </root>
     XML;
 
+    dd($xmlRequest);die;
+
         try {
             $client = new \SoapClient($wsdl, [
                 'trace' => true,
