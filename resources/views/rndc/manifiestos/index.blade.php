@@ -4,9 +4,9 @@
 
 @section('content')
 <div class="container mt-4">
-    <div class="d-flex justify-content-between mb-3">
-        <h1 class="h3">Man.RNDC</h1>
+    <h1 class="h3">Man.RNDC</h1>
 
+    <div class="d-flex justify-content-between mb-3">
         <div class="d-flex gap-2">
             {{-- Filtros --}}
             <form method="GET" action="{{ route('rndc.manifiestos.index') }}" class="d-flex gap-2">
