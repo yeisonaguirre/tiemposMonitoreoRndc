@@ -72,8 +72,7 @@ class RndcManifiestoController extends Controller
         ]);
     }
 
-    public function enviarEvento(Request $request, RndcManifiesto $manifiesto, RndcPuntoControl $punto, RndcService $service)
-    {
+    public function enviarEvento(Request $request, RndcManifiesto $manifiesto, RndcPuntoControl $punto, RndcService $service) {
         if ($punto->rndc_manifiesto_id !== $manifiesto->id) {
             abort(404);
         }
@@ -104,28 +103,38 @@ class RndcManifiestoController extends Controller
         } catch (\Exception $e) {
             return redirect()
                 ->route('rndc.manifiestos.show', $manifiesto)
-                ->with('error', 'Error al enviar el evento al webservice: '.$e->getMessage());
+                ->with('error', 'Error al enviar el evento al webservice: ' . $e->getMessage());
         }
 
-        // actualizar punto con lo enviado + respuesta
-        $punto->update([
-            'latitud'           => $data['latitud'],
-            'longitud'          => $data['longitud'],
-            'fecha_llegada'     => Carbon::createFromFormat('d/m/Y', $data['fechallegada'])->format('Y-m-d'),
-            'hora_llegada'      => $data['horallegada'],
-            'fecha_salida'      => Carbon::createFromFormat('d/m/Y', $data['fechasalida'])->format('Y-m-d'),
-            'hora_salida'       => $data['horasalida'],
-            'evento_enviado_at' => now(),
-            'numero_autorizacion'=> $result['numero_autorizacion'],
-            'finalizado'        => $result['ok'] && $result['numero_autorizacion'] ? true : false,
-            'xml_solicitud'     => $result['xml_request'],
-            'xml_respuesta'     => $result['xml_response'],
-        ]);
+        // Normalizamos resultado
+        $ok        = $result['ok']        ?? false;
+        $ingresoid = $result['ingresoid'] ?? null;
 
-        $msgType = $result['ok'] ? 'success' : 'error';
-        $msgText = $result['ok']
-            ? ('Evento enviado correctamente'.($result['numero_autorizacion'] ? ' — Autorización: '.$result['numero_autorizacion'] : ''))
-            : 'Hubo un error al enviar el evento al webservice.';
+        // Datos base que SIEMPRE se actualizan
+        $updateData = [
+            'latitud'       => $data['latitud'],
+            'longitud'      => $data['longitud'],
+            'fecha_llegada' => Carbon::createFromFormat('d/m/Y', $data['fechallegada'])->format('Y-m-d'),
+            'hora_llegada'  => $data['horallegada'],
+            'fecha_salida'  => Carbon::createFromFormat('d/m/Y', $data['fechasalida'])->format('Y-m-d'),
+            'hora_salida'   => $data['horasalida'],
+            'xml_solicitud' => $result['xml_request']  ?? null,
+            'xml_respuesta' => $result['xml_response'] ?? null,
+        ];
+
+        // Solo si RNDC respondió OK y con ingresoid válido marcamos como enviado/finalizado
+        if ($ok && $ingresoid) {
+            $updateData['evento_enviado_at']   = now();
+            $updateData['numero_autorizacion'] = $ingresoid; // aquí guardas el ingresoid
+            $updateData['finalizado']          = true;
+        }
+
+        $punto->update($updateData);
+
+        $msgType = $ok && $ingresoid ? 'success' : 'error';
+        $msgText = $ok && $ingresoid
+            ? 'Evento enviado correctamente — ID de ingreso: ' . $ingresoid
+            : 'Hubo un problema al enviar el evento: RNDC no devolvió un ID de ingreso válido.';
 
         return redirect()
             ->route('rndc.manifiestos.show', $manifiesto)

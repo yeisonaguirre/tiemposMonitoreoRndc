@@ -49,8 +49,6 @@ class RndcService
 
             $sendSoap = $client->AtenderMensajeRNDC($xmlRequest);
 
-            dd($sendSoap);
-
             if (is_string($sendSoap)) {
                 $rawResponse = $sendSoap;
             } elseif (is_object($sendSoap) && isset($sendSoap->return)) {
@@ -75,7 +73,6 @@ class RndcService
                 throw new \Exception('La respuesta del RNDC no es un XML válido.');
             }
 
-            // 👉 Manejar ErrorMSG del RNDC
             if (isset($xml->ErrorMSG)) {
                 $mensaje = trim((string) $xml->ErrorMSG);
 
@@ -217,26 +214,26 @@ class RndcService
         $xmlRequest = <<<XML
     <?xml version='1.0' encoding='iso-8859-1' ?>
     <root>
-    <acceso>
-        <username>{$user}</username>
-        <password>{$pass}</password>
-    </acceso>
-    <solicitud>
-        <tipo>1</tipo>
-        <procesoid>60</procesoid>
-    </solicitud>
-    <variables>
-        <numidgps>{$nitgps}</numidgps>
-        <ingresoidmanifiesto>{$data['ingresoidmanifiesto']}</ingresoidmanifiesto>
-        <numplaca>{$data['numplaca']}</numplaca>
-        <codpuntocontrol>{$data['codpuntocontrol']}</codpuntocontrol>
-        <latitud>{$data['latitud']}</latitud>
-        <longitud>{$data['longitud']}</longitud>
-        <fechallegada>{$data['fechallegada']}</fechallegada>
-        <horallegada>{$data['horallegada']}</horallegada>
-        <fechasalida>{$data['fechasalida']}</fechasalida>
-        <horasalida>{$data['horasalida']}</horasalida>
-    </variables>
+        <acceso>
+            <username>{$user}</username>
+            <password>{$pass}</password>
+        </acceso>
+        <solicitud>
+            <tipo>1</tipo>
+            <procesoid>60</procesoid>
+        </solicitud>
+        <variables>
+            <numidgps>{$nitgps}</numidgps>
+            <ingresoidmanifiesto>{$data['ingresoidmanifiesto']}</ingresoidmanifiesto>
+            <numplaca>{$data['numplaca']}</numplaca>
+            <codpuntocontrol>{$data['codpuntocontrol']}</codpuntocontrol>
+            <latitud>{$data['latitud']}</latitud>
+            <longitud>{$data['longitud']}</longitud>
+            <fechallegada>{$data['fechallegada']}</fechallegada>
+            <horallegada>{$data['horallegada']}</horallegada>
+            <fechasalida>{$data['fechasalida']}</fechasalida>
+            <horasalida>{$data['horasalida']}</horasalida>
+        </variables>
     </root>
     XML;
 
@@ -250,25 +247,48 @@ class RndcService
 
             $sendSoap = $client->AtenderMensajeRNDC($xmlRequest);
 
-            dd($sendSoap);
-
+            // La respuesta puede venir como string XML o como objeto con ->return
             $rawResponse = is_string($sendSoap)
                 ? $sendSoap
                 : ($sendSoap->return ?? '');
 
             $xml = $this->xmlSafeParse($rawResponse);
 
-            // Aquí ya puedes extraer el nro de autorización de $xml
-            $numeroAut = null;
-            if ($xml && isset($xml->documento->nroautorizacion)) {
-                $numeroAut = (string) $xml->documento->nroautorizacion;
+            if ($xml === false) {
+                logger()->error('RNDC: No se pudo parsear XML de respuesta', [
+                    'xml_response' => $rawResponse,
+                ]);
+                throw new \Exception('No se pudo interpretar la respuesta de RNDC');
+            }
+
+            // 1) Verificar si viene error
+            if (isset($xml->ErrorMSG)) {
+                $mensaje = trim((string) $xml->ErrorMSG);
+
+                logger()->error('RNDC: Error recibido', [
+                    'error'        => $mensaje,
+                    'xml_response' => $rawResponse,
+                ]);
+
+                throw new \Exception('Error RNDC: ' . $mensaje);
+            }
+
+            // 2) Extraer el ingresoid del root
+            $ingresoId = null;
+            if (isset($xml->ingresoid)) {
+                $ingresoId = (string) $xml->ingresoid;
+            }
+
+            // Opcional: si en algún escenario lo devuelven envuelto en <documento>
+            if (!$ingresoId && isset($xml->documento->ingresoid)) {
+                $ingresoId = (string) $xml->documento->ingresoid;
             }
 
             return [
-                'ok'                 => $xml !== false,
-                'numero_autorizacion'=> $numeroAut,
-                'xml_request'        => $xmlRequest,
-                'xml_response'       => $rawResponse,
+                'ok'           => !empty($ingresoId),
+                'ingresoid'    => $ingresoId,
+                'xml_request'  => $xmlRequest,
+                'xml_response' => $rawResponse,
             ];
 
         } catch (\SoapFault $e) {
