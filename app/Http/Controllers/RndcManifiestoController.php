@@ -35,6 +35,7 @@ class RndcManifiestoController extends Controller
 
     public function sync(RndcService $service)
     {
+        var_dump('llego hasta aqui'); die;
         $count = $service->syncManifiestosDesdeWebService();
 
         if ($count > 0) {
