@@ -16,7 +16,7 @@ class RndcService
      */
     public function consultarManifiestos(): ?SimpleXMLElement
     {
-        $url    = config('services.rndc.url');   // O wsdl si lo tienes así
+        $url    = config('services.rndc.url');
         $user   = config('services.rndc.user');
         $pass   = config('services.rndc.pass');
         $nitgps = config('services.rndc.nitgps');
@@ -209,7 +209,7 @@ class RndcService
 
     public function enviarEventoPuntoControl(array $data): array
     {
-        $wsdl   = config('services.rndc.wsdl');
+        $url    = config('services.rndc.url');
         $user   = config('services.rndc.user');
         $pass   = config('services.rndc.pass');
         $nitgps = config('services.rndc.nitgps');
@@ -241,15 +241,16 @@ class RndcService
     XML;
 
         try {
-            $client = new \SoapClient($wsdl, [
-                'trace' => true,
+            $client = new \SoapClient($url, [
+                'trace'      => true,
                 'exceptions' => true,
                 'cache_wsdl' => WSDL_CACHE_NONE,
+                'connection_timeout' => 10,
             ]);
 
             $sendSoap = $client->AtenderMensajeRNDC($xmlRequest);
 
-            dd($sendSoap);die;
+            dd($sendSoap);
 
             $rawResponse = is_string($sendSoap)
                 ? $sendSoap
