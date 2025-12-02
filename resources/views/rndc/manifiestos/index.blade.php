@@ -5,14 +5,58 @@
 @section('content')
 <div class="container mt-4">
     <div class="d-flex justify-content-between mb-3">
-        <h1 class="h3">Manifiestos RNDC</h1>
+        <h1 class="h3">Man.RNDC</h1>
 
-        <form method="POST" action="{{ route('rndc.manifiestos.sync') }}">
-            @csrf
-            <button type="submit" class="btn btn-primary">
-                🔄 Consultar nuevos
-            </button>
-        </form>
+        <div class="d-flex gap-2">
+            {{-- Filtros --}}
+            <form method="GET" action="{{ route('rndc.manifiestos.index') }}" class="d-flex gap-2">
+                <input type="text"
+                    name="ingresoidmanifiesto"
+                    class="form-control form-control-sm"
+                    placeholder="Ingreso ID"
+                    value="{{ request('ingresoidmanifiesto') }}">
+
+                <input type="text"
+                    name="nummanifiestocarga"
+                    class="form-control form-control-sm"
+                    placeholder="Manifiesto"
+                    value="{{ request('nummanifiestocarga') }}">
+
+                <input type="text"
+                    name="numplaca"
+                    class="form-control form-control-sm"
+                    placeholder="Placa"
+                    value="{{ request('numplaca') }}">
+
+                <input type="text"
+                    name="codigoempresa"
+                    class="form-control form-control-sm"
+                    placeholder="Empresa"
+                    value="{{ request('codigoempresa') }}">
+
+                <input type="text"
+                    name="fechaexpedicion"
+                    class="form-control form-control-sm"
+                    placeholder="Fecha Exp. (dd/mm/aaaa)"
+                    value="{{ request('fechaexpedicion') }}">
+
+                <button type="submit" class="btn btn-sm btn-secondary btn-fixed" title="Aplicar filtros">
+                    Buscar
+                </button>
+
+                <a href="{{ route('rndc.manifiestos.index') }}" class="btn btn-sm btn-outline-secondary btn-fixed" title="Limpiar filtros">
+                    Limpiar
+                </a>
+            </form>
+
+            {{-- Botón consultar nuevos --}}
+            <form method="POST" action="{{ route('rndc.manifiestos.sync') }}">
+                @csrf
+                <button type="submit" class="btn btn-sm btn-primary btn-fixed">
+                    🔄 Consultar nuevos
+                </button>
+            </form>
+        </div>
     </div>
 
     <div class="card shadow-sm">

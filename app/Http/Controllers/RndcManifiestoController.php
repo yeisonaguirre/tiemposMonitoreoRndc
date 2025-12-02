@@ -12,8 +12,7 @@ class RndcManifiestoController extends Controller
 {
     public function index(Request $request)
     {
-        // Puedes agregar filtros por fecha, placa, etc.
-        $manifiestos = RndcManifiesto::query()
+        $query = RndcManifiesto::query()
             ->select('rndc_manifiestos.*')
             ->leftJoin('rndc_puntos_control AS pc', function ($join) {
                 $join->on('pc.rndc_manifiesto_id', '=', 'rndc_manifiestos.id')
@@ -21,18 +20,49 @@ class RndcManifiestoController extends Controller
             })
             ->with(['puntosControl' => function ($q) {
                 $q->where('finalizado', false)
-                ->orderBy('fechacita'); // <-- orden interno de puntos de control
+                ->orderBy('fechacita'); // orden interno de puntos de control
             }])
             ->whereExists(function ($q) {
                 $q->selectRaw(1)
                     ->from('rndc_puntos_control')
                     ->whereColumn('rndc_manifiestos.id', 'rndc_puntos_control.rndc_manifiesto_id')
                     ->where('rndc_puntos_control.finalizado', false);
-            })
-            ->orderBy('pc.fechacita')   // <-- orden principal
+            });
+
+        // 🔍 Filtros
+        $query->when($request->filled('ingresoidmanifiesto'), function ($q) use ($request) {
+            $q->where('rndc_manifiestos.ingresoidmanifiesto', 'like', '%'.$request->ingresoidmanifiesto.'%');
+        });
+
+        $query->when($request->filled('nummanifiestocarga'), function ($q) use ($request) {
+            $q->where('rndc_manifiestos.nummanifiestocarga', 'like', '%'.$request->nummanifiestocarga.'%');
+        });
+
+        $query->when($request->filled('numplaca'), function ($q) use ($request) {
+            $q->where('rndc_manifiestos.numplaca', 'like', '%'.$request->numplaca.'%');
+        });
+
+        $query->when($request->filled('codigoempresa'), function ($q) use ($request) {
+            $q->where('rndc_manifiestos.codigoempresa', 'like', '%'.$request->codigoempresa.'%');
+        });
+
+        // Filtro por fecha de expedición (formato d/m/Y)
+        $query->when($request->filled('fechaexpedicion'), function ($q) use ($request) {
+            try {
+                $fecha = Carbon::createFromFormat('d/m/Y', $request->fechaexpedicion)->format('Y-m-d');
+                $q->whereDate('rndc_manifiestos.fechaexpedicionmanifiesto', $fecha);
+            } catch (\Exception $e) {
+                // si la fecha viene mal, simplemente no filtramos
+            }
+        });
+
+        // Orden
+        $query
+            ->orderBy('pc.fechacita') // orden principal por fecha cita del punto no finalizado
             ->orderByDesc('rndc_manifiestos.fechaexpedicionmanifiesto')
-            ->orderByDesc('rndc_manifiestos.id')
-            ->paginate(20);
+            ->orderByDesc('rndc_manifiestos.id');
+
+        $manifiestos = $query->paginate(20)->appends($request->query());
 
         return view('rndc.manifiestos.index', compact('manifiestos'));
     }
