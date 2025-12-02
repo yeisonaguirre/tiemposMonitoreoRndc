@@ -13,14 +13,25 @@ class RndcManifiestoController extends Controller
     public function index(Request $request)
     {
         // Puedes agregar filtros por fecha, placa, etc.
-        $manifiestos = RndcManifiesto::with(['puntosControl' => function ($q) {
-                $q->where('finalizado', false);
-            }])
-            ->whereHas('puntosControl', function ($q) {
-                $q->where('finalizado', false);
+        $manifiestos = RndcManifiesto::query()
+            ->select('rndc_manifiestos.*')
+            ->leftJoin('rndc_puntos_control AS pc', function ($join) {
+                $join->on('pc.rndc_manifiesto_id', '=', 'rndc_manifiestos.id')
+                    ->where('pc.finalizado', false);
             })
-            ->orderByDesc('fechaexpedicionmanifiesto')
-            ->orderByDesc('id')
+            ->with(['puntosControl' => function ($q) {
+                $q->where('finalizado', false)
+                ->orderBy('fechacita'); // <-- orden interno de puntos de control
+            }])
+            ->whereExists(function ($q) {
+                $q->selectRaw(1)
+                    ->from('rndc_puntos_control')
+                    ->whereColumn('rndc_manifiestos.id', 'rndc_puntos_control.rndc_manifiesto_id')
+                    ->where('rndc_puntos_control.finalizado', false);
+            })
+            ->orderBy('pc.fechacita')   // <-- orden principal
+            ->orderByDesc('rndc_manifiestos.fechaexpedicionmanifiesto')
+            ->orderByDesc('rndc_manifiestos.id')
             ->paginate(20);
 
         return view('rndc.manifiestos.index', compact('manifiestos'));
