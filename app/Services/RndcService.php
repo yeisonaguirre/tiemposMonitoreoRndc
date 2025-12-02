@@ -39,6 +39,8 @@ class RndcService
             </root>
             XML;
 
+        dd($xmlRequest);
+
         try {
             $client = new \SoapClient($url, [
                 'trace'      => true,
