@@ -16,7 +16,7 @@ use App\Http\Controllers\RndcManifiestoController;
 */
 
 Route::get('/', function () {
-    return view('welcome');
+    redirect('/rndc/manifiestos');
 });
 
 Route::get('/rndc/manifiestos', [RndcManifiestoController::class, 'index'])

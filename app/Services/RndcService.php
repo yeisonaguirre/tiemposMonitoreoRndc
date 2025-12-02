@@ -5,10 +5,9 @@ namespace App\Services;
 use App\Models\RndcManifiesto;
 use App\Models\RndcPuntoControl;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 use SimpleXMLElement;
+use Illuminate\Support\Facades\Cache;
 
 class RndcService
 {
@@ -17,77 +16,88 @@ class RndcService
      */
     public function consultarManifiestos(): ?SimpleXMLElement
     {
-        $wsdl   = config('services.rndc.wsdl');
+        $url    = config('services.rndc.url');   // O wsdl si lo tienes así
         $user   = config('services.rndc.user');
         $pass   = config('services.rndc.pass');
         $nitgps = config('services.rndc.nitgps');
 
-        // 1. Armar XML EXACTAMENTE como te piden
         $xmlRequest = <<<XML
-<?xml version='1.0' encoding='ISO-8859-1'?>
-<root>
-  <acceso>
-    <username>{$user}</username>
-    <password>{$pass}</password>
-  </acceso>
-  <solicitud>
-    <tipo>9</tipo>
-    <procesoid>4</procesoid>
-  </solicitud>
-  <documento>
-    <numidgps>{$nitgps}</numidgps>
-    <manifiestos>nuevos</manifiestos>
-  </documento>
-</root>
-XML;
-
-        // Opcional para debug:
-        // logger()->info('RNDC XML REQUEST', ['xml' => $xmlRequest]);
+            <?xml version='1.0' encoding='ISO-8859-1'?>
+            <root>
+            <acceso>
+                <username>{$user}</username>
+                <password>{$pass}</password>
+            </acceso>
+            <solicitud>
+                <tipo>9</tipo>
+                <procesoid>4</procesoid>
+            </solicitud>
+            <documento>
+                <numidgps>{$nitgps}</numidgps>
+                <manifiestos>nuevos</manifiestos>
+            </documento>
+            </root>
+            XML;
 
         try {
-            // 2. Crear SoapClient apuntando al WSDL
-            $client = new \SoapClient($wsdl, [
+            $client = new \SoapClient($url, [
                 'trace'      => true,
                 'exceptions' => true,
                 'cache_wsdl' => WSDL_CACHE_NONE,
-                // timeouts opcionales:
                 'connection_timeout' => 10,
             ]);
 
-            // 3. Llamar al método AtenderMensajeRNDC
-            //    El WSDL dice que el parámetro se llama "Request" y es xs:string
             $sendSoap = $client->AtenderMensajeRNDC($xmlRequest);
 
-            // Puede venir:
-            //  - como string directo
-            //  - o como objeto con propiedad ->return
             if (is_string($sendSoap)) {
                 $rawResponse = $sendSoap;
             } elseif (is_object($sendSoap) && isset($sendSoap->return)) {
                 $rawResponse = $sendSoap->return;
             } else {
-                // Forma inesperada
-                // logger()->error('Respuesta RNDC inesperada', ['resp' => $sendSoap]);
+                logger()->error('Respuesta RNDC inesperada', ['resp' => $sendSoap]);
                 return null;
             }
+
+            // 👉 Guardar SIEMPRE la última respuesta en cache
+            Cache::put(
+                'rndc:last_response_xml',
+                trim($rawResponse) !== '' ? $rawResponse : '<root><Error>No hay XML válido</Error></root>',
+                now()->addMinutes(15)
+            );
 
             // 4. Parsear la respuesta a XML seguro
             $xml = $this->xmlSafeParse($rawResponse);
 
             if ($xml === false) {
-                return null;
+                logger()->error('RNDC: XML inválido en respuesta', ['raw' => $rawResponse]);
+                throw new \Exception('La respuesta del RNDC no es un XML válido.');
+            }
+
+            // 👉 Manejar ErrorMSG del RNDC
+            if (isset($xml->ErrorMSG)) {
+                $mensaje = trim((string) $xml->ErrorMSG);
+
+                logger()->error('RNDC: Error recibido', [
+                    'error' => $mensaje,
+                    // Opcional: también podrías guardar aparte
+                    // 'xml'   => $rawResponse,
+                ]);
+
+                // Ya el XML quedó cacheado arriba
+                throw new \Exception('Error RNDC: ' . $mensaje);
             }
 
             return $xml;
 
         } catch (\SoapFault $e) {
-            // Loguear el error SOAP
             logger()->error('Error SOAP AtenderMensajeRNDC', [
-                'code'    => $e->faultcode ?? null,
-                'string'  => $e->faultstring ?? $e->getMessage(),
+                'code'   => $e->faultcode ?? null,
+                'string' => $e->faultstring ?? $e->getMessage(),
             ]);
 
-            return null;
+            throw new \Exception(
+                'Error de comunicación con RNDC: ' . ($e->faultstring ?? $e->getMessage())
+            );
         }
     }
 
@@ -130,44 +140,69 @@ XML;
 
         $count = 0;
 
-        foreach ($xml->documento as $doc) {
+        DB::transaction(function () use ($xml, &$count) {
 
-            $ingresoId = (string) $doc->ingresoidmanifiesto;
+            foreach ($xml->documento as $doc) {
 
-            $manifiesto = RndcManifiesto::updateOrCreate(
-                ['ingresoidmanifiesto' => $ingresoId],
-                [
-                    'numnitempresatransporte'   => (string) $doc->numnitempresatransporte,
-                    'fechaexpedicionmanifiesto' => $this->parseDate((string) $doc->fechaexpedicionmanifiesto),
-                    'codigoempresa'             => (string) $doc->codigoempresa,
-                    'nummanifiestocarga'        => (string) $doc->nummanifiestocarga,
-                    'numplaca'                  => (string) $doc->numplaca,
-                ]
-            );
+                $ingresoId = trim((string) $doc->ingresoidmanifiesto);
 
-            // Borrar puntos de control previos (si actualizas históricos o quieres siempre la última versión)
-            $manifiesto->puntosControl()->delete();
-
-            if (isset($doc->puntoscontrol->puntocontrol)) {
-                foreach ($doc->puntoscontrol->puntocontrol as $pc) {
-                    RndcPuntoControl::create([
-                        'rndc_manifiesto_id' => $manifiesto->id,
-                        'codpuntocontrol'    => (int) $pc->codpuntocontrol,
-                        'codmunicipio'       => (string) $pc->codmunicipio,
-                        'direccion'          => (string) $pc->direccion,
-                        'fechacita'          => $this->parseDate((string) $pc->fechacita),
-                        'horacita'           => (string) $pc->horacita,
-                        'latitud'            => ($pc->latitud != '') ? (float) $pc->latitud : null,
-                        'longitud'           => ($pc->longitud != '') ? (float) $pc->longitud : null,
-                        'tiempopactado'      => (int) $pc->tiempopactado,
-                    ]);
+                if ($ingresoId === '') {
+                    // Si viene un documento sin ingresoidmanifiesto lo saltamos
+                    continue;
                 }
-            }
 
-            $count++;
-        }
+                $manifiesto = RndcManifiesto::updateOrCreate(
+                    ['ingresoidmanifiesto' => $ingresoId],
+                    [
+                        'numnitempresatransporte'   => trim((string) $doc->numnitempresatransporte),
+                        'fechaexpedicionmanifiesto' => $this->parseDate((string) $doc->fechaexpedicionmanifiesto),
+                        'codigoempresa'             => trim((string) $doc->codigoempresa),
+                        'nummanifiestocarga'        => trim((string) $doc->nummanifiestocarga),
+                        'numplaca'                  => trim((string) $doc->numplaca),
+
+                        // Si quieres guardar el XML del documento puntual:
+                        // 'xml_ultima_respuesta'      => $doc->asXML(),
+                    ]
+                );
+
+                // Limpia puntos de control previos para este manifiesto
+                $manifiesto->puntosControl()->delete();
+
+                if (isset($doc->puntoscontrol->puntocontrol)) {
+                    foreach ($doc->puntoscontrol->puntocontrol as $pc) {
+
+                        $latitud  = trim((string) $pc->latitud);
+                        $longitud = trim((string) $pc->longitud);
+                        $tiempo   = trim((string) $pc->tiempopactado);
+
+                        RndcPuntoControl::create([
+                            'rndc_manifiesto_id' => $manifiesto->id,
+                            'codpuntocontrol'    => $this->toNullableInt($pc->codpuntocontrol),
+                            'codmunicipio'       => trim((string) $pc->codmunicipio),
+                            'direccion'          => trim((string) $pc->direccion),
+                            'fechacita'          => $this->parseDate((string) $pc->fechacita),
+                            'horacita'           => trim((string) $pc->horacita),
+                            'latitud'            => ($latitud  !== '' ? (float) $latitud  : null),
+                            'longitud'           => ($longitud !== '' ? (float) $longitud : null),
+                            'tiempopactado'      => ($tiempo   !== '' ? (int) $tiempo   : null),
+                        ]);
+                    }
+                }
+
+                $count++;
+            }
+        });
 
         return $count;
+    }
+
+    /**
+     * Convierte un valor SimpleXMLElement a int o null si viene vacío.
+     */
+    protected function toNullableInt($value): ?int
+    {
+        $v = trim((string) $value);
+        return $v === '' ? null : (int) $v;
     }
 
     public function enviarEventoPuntoControl(array $data): array
@@ -202,8 +237,6 @@ XML;
     </variables>
     </root>
     XML;
-
-    dd($xmlRequest);die;
 
         try {
             $client = new \SoapClient($wsdl, [
@@ -253,13 +286,17 @@ XML;
      */
     public function syncManifiestosDesdeWebService(): int
     {
-        $xml = $this->consultarManifiestos(); // ahora viene desde SOAP
+        try {
+            $xml = $this->consultarManifiestos(); // ahora viene desde SOAP
 
-        if (!$xml) {
-            return 0;
+            if (!$xml) {
+                return 0;
+            }
+
+            return $this->syncFromXml($xml);
+        } catch (\Exception $e) {
+            throw new \Exception('No se pudo consultar RNDC: ' . $e->getMessage());
         }
-
-        return $this->syncFromXml($xml);
     }
 
     private function parseDate(?string $date): ?string

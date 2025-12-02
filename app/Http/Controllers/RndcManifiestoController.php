@@ -35,9 +35,12 @@ class RndcManifiestoController extends Controller
 
     public function sync(RndcService $service)
     {
-        var_dump('llego hasta aqui'); die;
-        $count = $service->syncManifiestosDesdeWebService();
-
+        try {
+            $count = $service->syncManifiestosDesdeWebService();
+        } catch (\Exception $e) {
+            return back()->with('error', 'Error al sincronizar manifiestos: '.$e->getMessage());
+        }
+        
         if ($count > 0) {
             return back()->with('success', "Se actualizaron {$count} manifiestos.");
         }
