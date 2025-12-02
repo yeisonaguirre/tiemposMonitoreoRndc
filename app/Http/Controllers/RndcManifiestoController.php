@@ -33,6 +33,17 @@ class RndcManifiestoController extends Controller
         return view('rndc.manifiestos.show', compact('manifiesto'));
     }
 
+    public function sync(RndcService $service)
+    {
+        $count = $service->syncManifiestosDesdeWebService();
+
+        if ($count > 0) {
+            return back()->with('success', "Se actualizaron {$count} manifiestos.");
+        }
+
+        return back()->with('warning', 'No se encontraron nuevos manifiestos o hubo un error en la consulta.');
+    }
+
     public function crearEvento(RndcManifiesto $manifiesto, RndcPuntoControl $punto)
     {
         // (Opcional) validar que el punto pertenece al manifiesto

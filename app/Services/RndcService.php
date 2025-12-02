@@ -17,22 +17,13 @@ class RndcService
      */
     public function consultarManifiestos(): ?SimpleXMLElement
     {
-        $url    = config('services.rndc.url');
+        $wsdl   = config('services.rndc.wsdl');
         $user   = config('services.rndc.user');
         $pass   = config('services.rndc.pass');
         $nitgps = config('services.rndc.nitgps');
 
-        // 🔹 OPCIONAL: si quieres simular con archivo en local, descomenta este bloque:
-        /*
-        if (app()->environment('local') && Storage::exists('rndc/historico_inicial.txt')) {
-            $fake = Storage::get('rndc/historico_inicial.txt');
-            $fakeUtf8 = mb_convert_encoding($fake, 'UTF-8', 'ISO-8859-1');
-            return simplexml_load_string($fakeUtf8) ?: null;
-        }
-        */
-
-        // Construir el XML de solicitud (sin sangría rara)
-        $xml = <<<XML
+        // 1. Armar XML EXACTAMENTE como te piden
+        $xmlRequest = <<<XML
 <?xml version='1.0' encoding='ISO-8859-1'?>
 <root>
   <acceso>
@@ -45,36 +36,87 @@ class RndcService
   </solicitud>
   <documento>
     <numidgps>{$nitgps}</numidgps>
-    <manifiestos>TODOS</manifiestos>
+    <manifiestos>nuevos</manifiestos>
   </documento>
 </root>
 XML;
 
-        // Consumir el servicio via POST
-        $response = Http::withHeaders([
-                'Content-Type' => 'application/xml; charset=ISO-8859-1',
-            ])
-            ->withBody($xml, 'application/xml')
-            ->post($url);
+        // Opcional para debug:
+        // logger()->info('RNDC XML REQUEST', ['xml' => $xmlRequest]);
 
-        if (!$response->successful()) {
-            logger()->error('Error al consultar RNDC', [
-                'status' => $response->status(),
-                'body'   => $response->body(),
+        try {
+            // 2. Crear SoapClient apuntando al WSDL
+            $client = new \SoapClient($wsdl, [
+                'trace'      => true,
+                'exceptions' => true,
+                'cache_wsdl' => WSDL_CACHE_NONE,
+                // timeouts opcionales:
+                'connection_timeout' => 10,
             ]);
+
+            // 3. Llamar al método AtenderMensajeRNDC
+            //    El WSDL dice que el parámetro se llama "Request" y es xs:string
+            $sendSoap = $client->AtenderMensajeRNDC($xmlRequest);
+
+            // Puede venir:
+            //  - como string directo
+            //  - o como objeto con propiedad ->return
+            if (is_string($sendSoap)) {
+                $rawResponse = $sendSoap;
+            } elseif (is_object($sendSoap) && isset($sendSoap->return)) {
+                $rawResponse = $sendSoap->return;
+            } else {
+                // Forma inesperada
+                // logger()->error('Respuesta RNDC inesperada', ['resp' => $sendSoap]);
+                return null;
+            }
+
+            // 4. Parsear la respuesta a XML seguro
+            $xml = $this->xmlSafeParse($rawResponse);
+
+            if ($xml === false) {
+                return null;
+            }
+
+            return $xml;
+
+        } catch (\SoapFault $e) {
+            // Loguear el error SOAP
+            logger()->error('Error SOAP AtenderMensajeRNDC', [
+                'code'    => $e->faultcode ?? null,
+                'string'  => $e->faultstring ?? $e->getMessage(),
+            ]);
+
             return null;
         }
+    }
 
-        $body = $response->body();
+    /**
+     * Versión "segura" de simplexml_load_string, igual a tu xml_safe_parse
+     */
+    private function xmlSafeParse(string $xmlString): SimpleXMLElement|false
+    {
+        if (trim($xmlString) === '') {
+            return false;
+        }
 
-        // Guardar la respuesta cruda en cache por 15 minutos (Redis si tienes CACHE_DRIVER=redis)
-        Cache::put('rndc:last_response_xml', $body, now()->addMinutes(15));
+        libxml_use_internal_errors(true);
 
-        // Convertir de ISO-8859-1 a UTF-8 (para evitar problemas)
-        $bodyUtf8  = mb_convert_encoding($body, 'UTF-8', 'ISO-8859-1');
-        $xmlObject = simplexml_load_string($bodyUtf8);
+        // Normalizar a UTF-8 si viene en ISO-8859-1
+        $xmlUtf8 = mb_convert_encoding($xmlString, 'UTF-8', 'ISO-8859-1,UTF-8');
 
-        return $xmlObject ?: null;
+        $xml = simplexml_load_string($xmlUtf8);
+
+        if ($xml === false) {
+            foreach (libxml_get_errors() as $err) {
+                logger()->error('XML error RNDC: ' . $err->message);
+            }
+            libxml_clear_errors();
+            return false;
+        }
+
+        libxml_clear_errors();
+        return $xml;
     }
 
     /**
@@ -130,76 +172,78 @@ XML;
 
     public function enviarEventoPuntoControl(array $data): array
     {
-        $url    = config('services.rndc.url');
+        $wsdl   = config('services.rndc.wsdl');
         $user   = config('services.rndc.user');
         $pass   = config('services.rndc.pass');
         $nitgps = config('services.rndc.nitgps');
 
-        $xml = <<<XML
-            <?xml version='1.0' encoding='iso-8859-1'?>
-            <root>
-            <acceso>
-                <username>{$user}</username>
-                <password>{$pass}</password>
-            </acceso>
-            <solicitud>
-                <tipo>1</tipo>
-                <procesoid>60</procesoid>
-            </solicitud>
-            <variables>
-                <numidgps>{$nitgps}</numidgps>
-                <ingresoidmanifiesto>{$data['ingresoidmanifiesto']}</ingresoidmanifiesto>
-                <numplaca>{$data['numplaca']}</numplaca>
-                <codpuntocontrol>{$data['codpuntocontrol']}</codpuntocontrol>
-                <latitud>{$data['latitud']}</latitud>
-                <longitud>{$data['longitud']}</longitud>
-                <fechallegada>{$data['fechallegada']}</fechallegada>
-                <horallegada>{$data['horallegada']}</horallegada>
-                <fechasalida>{$data['fechasalida']}</fechasalida>
-                <horasalida>{$data['horasalida']}</horasalida>
-            </variables>
-            </root>
-            XML;
+        $xmlRequest = <<<XML
+    <?xml version='1.0' encoding='iso-8859-1' ?>
+    <root>
+    <acceso>
+        <username>{$user}</username>
+        <password>{$pass}</password>
+    </acceso>
+    <solicitud>
+        <tipo>1</tipo>
+        <procesoid>60</procesoid>
+    </solicitud>
+    <variables>
+        <numidgps>{$nitgps}</numidgps>
+        <ingresoidmanifiesto>{$data['ingresoidmanifiesto']}</ingresoidmanifiesto>
+        <numplaca>{$data['numplaca']}</numplaca>
+        <codpuntocontrol>{$data['codpuntocontrol']}</codpuntocontrol>
+        <latitud>{$data['latitud']}</latitud>
+        <longitud>{$data['longitud']}</longitud>
+        <fechallegada>{$data['fechallegada']}</fechallegada>
+        <horallegada>{$data['horallegada']}</horallegada>
+        <fechasalida>{$data['fechasalida']}</fechasalida>
+        <horasalida>{$data['horasalida']}</horasalida>
+    </variables>
+    </root>
+    XML;
 
-        $response = Http::withHeaders([
-                'Content-Type' => 'application/xml; charset=ISO-8859-1',
-            ])
-            ->withBody($xml, 'application/xml')
-            ->post($url);
-
-        $ok   = $response->successful();
-        $body = $response->body();
-
-        Cache::put('rndc:last_event_response_xml', $body, now()->addMinutes(15));
-
-        $numeroAut = null;
-
-        $bodyUtf8 = mb_convert_encoding($body, 'UTF-8', 'ISO-8859-1');
-        $xmlResp  = @simplexml_load_string($bodyUtf8);
-
-        if ($xmlResp) {
-            // intentamos varios nombres posibles
-            foreach (['ingresoid', 'nroautorizacion', 'autorizacion', 'numero_autorizacion'] as $tag) {
-                if (isset($xmlResp->$tag)) {
-                    $numeroAut = (string) $xmlResp->$tag;
-                    break;
-                }
-            }
-        }
-
-        if (! $ok) {
-            logger()->error('Error al enviar evento punto de control RNDC', [
-                'status' => $response->status(),
-                'body'   => $body,
+        try {
+            $client = new \SoapClient($wsdl, [
+                'trace' => true,
+                'exceptions' => true,
+                'cache_wsdl' => WSDL_CACHE_NONE,
             ]);
-        }
 
-        return [
-            'ok'                 => $ok,
-            'numero_autorizacion'=> $numeroAut,
-            'xml_request'        => $xml,
-            'xml_response'       => $body,
-        ];
+            $sendSoap = $client->AtenderMensajeRNDC($xmlRequest);
+
+            $rawResponse = is_string($sendSoap)
+                ? $sendSoap
+                : ($sendSoap->return ?? '');
+
+            $xml = $this->xmlSafeParse($rawResponse);
+
+            // Aquí ya puedes extraer el nro de autorización de $xml
+            $numeroAut = null;
+            if ($xml && isset($xml->documento->nroautorizacion)) {
+                $numeroAut = (string) $xml->documento->nroautorizacion;
+            }
+
+            return [
+                'ok'                 => $xml !== false,
+                'numero_autorizacion'=> $numeroAut,
+                'xml_request'        => $xmlRequest,
+                'xml_response'       => $rawResponse,
+            ];
+
+        } catch (\SoapFault $e) {
+            logger()->error('Error SOAP evento RNDC', [
+                'code'   => $e->faultcode ?? null,
+                'string' => $e->faultstring ?? $e->getMessage(),
+            ]);
+
+            return [
+                'ok'                 => false,
+                'numero_autorizacion'=> null,
+                'xml_request'        => $xmlRequest,
+                'xml_response'       => null,
+            ];
+        }
     }
 
     /**
@@ -207,7 +251,7 @@ XML;
      */
     public function syncManifiestosDesdeWebService(): int
     {
-        $xml = $this->consultarManifiestos();
+        $xml = $this->consultarManifiestos(); // ahora viene desde SOAP
 
         if (!$xml) {
             return 0;

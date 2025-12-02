@@ -4,8 +4,16 @@
 
 @section('content')
 <div class="container mt-4">
+    <div class="d-flex justify-content-between mb-3">
+        <h1 class="h3">Manifiestos RNDC</h1>
 
-    <h1 class="h3 mb-4">Manifiestos RNDC</h1>
+        <form method="POST" action="{{ route('rndc.manifiestos.sync') }}">
+            @csrf
+            <button type="submit" class="btn btn-primary">
+                🔄 Consultar nuevos
+            </button>
+        </form>
+    </div>
 
     <div class="card shadow-sm">
         <div class="card-body p-0">
