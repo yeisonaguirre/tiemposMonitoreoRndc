@@ -20,12 +20,25 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 });
 
 Route::post('/rndc/import-historico', function () {
-    $xmlString = Storage::get('rndc_respuesta.txt');
-    $xmlUtf8 = mb_convert_encoding($xmlString, 'UTF-8', 'ISO-8859-1');
-    $xml = simplexml_load_string($xmlUtf8);
+    try {
+        if (!Storage::exists('rndc_respuesta.txt')) {
+            throw new \Exception('El archivo rndc_respuesta.txt no existe.');
+        }
 
-    $count = app(\App\Services\RndcService::class)->syncFromXml($xml);
+        $xmlString = Storage::get('rndc_respuesta.txt');
 
-    return ['ok' => true, 'imported' => $count];
+        if (empty($xmlString)) {
+            throw new \Exception('El archivo rndc_respuesta.txt está vacío o no existe.');
+        }
+
+        $xmlUtf8 = mb_convert_encoding($xmlString, 'UTF-8', 'ISO-8859-1');
+        $xml = simplexml_load_string($xmlUtf8);
+
+        $count = app(\App\Services\RndcService::class)->syncFromXml($xml);
+
+        return ['ok' => true, 'imported' => $count];
+    } catch (\Exception $e) {
+        return ['ok' => false, 'error' => $e->getMessage()];
+    }
 });
 
