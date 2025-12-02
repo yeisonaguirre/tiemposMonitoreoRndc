@@ -39,7 +39,11 @@ class RndcManifiestoController extends Controller
 
     public function show(RndcManifiesto $manifiesto)
     {
-        $manifiesto->load('puntosControl');
+        $manifiesto->load([
+            'puntosControl' => function ($q) {
+                $q->orderBy('fechacita', 'asc');
+            }
+        ]);
 
         return view('rndc.manifiestos.show', compact('manifiesto'));
     }
