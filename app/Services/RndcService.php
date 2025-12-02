@@ -39,8 +39,6 @@ class RndcService
             </root>
             XML;
 
-        dd($xmlRequest);
-
         try {
             $client = new \SoapClient($url, [
                 'trace'      => true,
@@ -50,6 +48,8 @@ class RndcService
             ]);
 
             $sendSoap = $client->AtenderMensajeRNDC($xmlRequest);
+
+            dd($sendSoap);
 
             if (is_string($sendSoap)) {
                 $rawResponse = $sendSoap;
