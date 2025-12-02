@@ -276,12 +276,9 @@ class RndcService
                 'string' => $e->faultstring ?? $e->getMessage(),
             ]);
 
-            return [
-                'ok'                 => false,
-                'numero_autorizacion'=> null,
-                'xml_request'        => $xmlRequest,
-                'xml_response'       => null,
-            ];
+            throw new \Exception(
+                'Error de comunicación con RNDC: ' . ($e->faultstring ?? $e->getMessage())
+            );
         }
     }
 

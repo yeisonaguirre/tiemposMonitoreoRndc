@@ -99,7 +99,13 @@ class RndcManifiestoController extends Controller
             'horasalida'          => $data['horasalida'],
         ];
 
-        $result = $service->enviarEventoPuntoControl($payload);
+        try {
+            $result = $service->enviarEventoPuntoControl($payload);
+        } catch (\Exception $e) {
+            return redirect()
+                ->route('rndc.manifiestos.show', $manifiesto)
+                ->with('error', 'Error al enviar el evento al webservice: '.$e->getMessage());
+        }
 
         // actualizar punto con lo enviado + respuesta
         $punto->update([
