@@ -58,8 +58,8 @@ class RndcManifiestoController extends Controller
 
         // Orden
         $query
+            ->orderByDesc('rndc_manifiestos.fechaexpedicionmanifiesto', 'desc')
             ->orderBy('pc.fechacita') // orden principal por fecha cita del punto no finalizado
-            ->orderByDesc('rndc_manifiestos.fechaexpedicionmanifiesto')
             ->orderByDesc('rndc_manifiestos.id');
 
         $manifiestos = $query->paginate(20)->appends($request->query());
