@@ -10,31 +10,37 @@ use Illuminate\Support\Carbon;
 
 class FetchRndcManifiestos extends Command
 {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
     protected $signature = 'rndc:fetch-manifiestos';
 
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
     protected $description = 'Consulta el web service RNDC y guarda los manifiestos y puntos de control';
 
-    /**
-     * Execute the console command.
-     */
     public function handle(RndcService $service): int
     {
-        $xml = $service->consultarManifiestos();
+        $this->info('Iniciando consulta RNDC...');
+
+        try {
+            $xml = $service->consultarManifiestos();
+        } catch (\Throwable $e) {
+            // 📌 Aquí atrapamos errores tipo "I/O error 103", timeouts, etc.
+            $this->error('Error al consultar RNDC: ' . $e->getMessage());
+
+            logger()->error('CRON rndc:fetch-manifiestos falló al consultar RNDC', [
+                'exception' => $e,
+            ]);
+
+            // Si quieres que el cron se marque como fallo:
+            return self::FAILURE;
+
+            // Si prefieres que el cron "no falle" pero quede log:
+            // return self::SUCCESS;
+        }
 
         if (!$xml || !isset($xml->documento)) {
             $this->error('No se recibió información válida desde RNDC');
             return self::FAILURE;
         }
+
+        $procesados = 0;
 
         foreach ($xml->documento as $doc) {
             $ingresoId = (string) $doc->ingresoidmanifiesto;
@@ -43,15 +49,15 @@ class FetchRndcManifiestos extends Command
             $manifiesto = RndcManifiesto::updateOrCreate(
                 ['ingresoidmanifiesto' => $ingresoId],
                 [
-                    'numnitempresatransporte'  => (string) $doc->numnitempresatransporte,
-                    'fechaexpedicionmanifiesto'=> $this->parseDate((string) $doc->fechaexpedicionmanifiesto),
-                    'codigoempresa'            => (string) $doc->codigoempresa,
-                    'nummanifiestocarga'       => (string) $doc->nummanifiestocarga,
-                    'numplaca'                 => (string) $doc->numplaca,
+                    'numnitempresatransporte'   => (string) $doc->numnitempresatransporte,
+                    'fechaexpedicionmanifiesto' => $this->parseDate((string) $doc->fechaexpedicionmanifiesto),
+                    'codigoempresa'             => (string) $doc->codigoempresa,
+                    'nummanifiestocarga'        => (string) $doc->nummanifiestocarga,
+                    'numplaca'                  => (string) $doc->numplaca,
                 ]
             );
 
-            // Limpiar puntos de control anteriores y volver a crear (opcional)
+            // Limpiar puntos de control anteriores
             $manifiesto->puntosControl()->delete();
 
             if (isset($doc->puntoscontrol->puntocontrol)) {
@@ -69,9 +75,12 @@ class FetchRndcManifiestos extends Command
                     ]);
                 }
             }
+
+            $procesados++;
         }
 
-        $this->info('Manifiestos RNDC actualizados correctamente.');
+        $this->info("Manifiestos RNDC actualizados correctamente. Procesados: {$procesados}");
+
         return self::SUCCESS;
     }
 
