@@ -67,7 +67,7 @@ class RndcService
             Cache::put(
                 'rndc:last_response_xml',
                 trim($rawResponse) !== '' ? $rawResponse : '<root><Error>No hay XML válido</Error></root>',
-                now()->addMinutes(15)
+                now()->addMinutes(10)
             );
 
             // 4. Parsear la respuesta a XML seguro
