@@ -13,7 +13,8 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule): void
     {
         // $schedule->command('inspire')->hourly();
-        $schedule->command('rndc:fetch-manifiestos')->everyTwentyMinutes();
+        $schedule->command('rndc:fetch-manifiestos')
+            ->cron('*/20 * * * *');
     }
 
     /**
