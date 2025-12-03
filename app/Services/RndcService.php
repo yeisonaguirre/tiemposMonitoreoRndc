@@ -41,10 +41,15 @@ class RndcService
 
         try {
             $client = new \SoapClient($url, [
-                'trace'      => true,
-                'exceptions' => true,
-                'cache_wsdl' => WSDL_CACHE_NONE,
-                'connection_timeout' => 10,
+                'trace'              => true,
+                'exceptions'         => true,
+                'cache_wsdl'         => WSDL_CACHE_NONE,
+                'connection_timeout' => 30, // antes 10
+                'stream_context'     => stream_context_create([
+                    'http' => [
+                        'timeout' => 60,   // tiempo máximo para leer respuesta
+                    ],
+                ]),
             ]);
 
             $sendSoap = $client->AtenderMensajeRNDC($xmlRequest);
@@ -239,10 +244,15 @@ class RndcService
 
         try {
             $client = new \SoapClient($url, [
-                'trace'      => true,
-                'exceptions' => true,
-                'cache_wsdl' => WSDL_CACHE_NONE,
-                'connection_timeout' => 10,
+                'trace'              => true,
+                'exceptions'         => true,
+                'cache_wsdl'         => WSDL_CACHE_NONE,
+                'connection_timeout' => 30, // antes 10
+                'stream_context'     => stream_context_create([
+                    'http' => [
+                        'timeout' => 60,   // tiempo máximo para leer respuesta
+                    ],
+                ]),
             ]);
 
             $sendSoap = $client->AtenderMensajeRNDC($xmlRequest);
