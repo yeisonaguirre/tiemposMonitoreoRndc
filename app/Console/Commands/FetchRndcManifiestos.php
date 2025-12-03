@@ -20,6 +20,8 @@ class FetchRndcManifiestos extends Command
 
         try {
             $xml = $service->consultarManifiestos();
+
+            $this->info('Consulta RNDC completada.');
         } catch (\Throwable $e) {
             // 📌 Aquí atrapamos errores tipo "I/O error 103", timeouts, etc.
             $this->error('Error al consultar RNDC: ' . $e->getMessage());
@@ -40,9 +42,13 @@ class FetchRndcManifiestos extends Command
             return self::FAILURE;
         }
 
+        $this->info('Procesando manifiestos recibidos...');
+
         $procesados = 0;
 
         foreach ($xml->documento as $doc) {
+            $this->info('Procesando manifiesto ID: ' . (string) $doc->ingresoidmanifiesto);
+
             $ingresoId = (string) $doc->ingresoidmanifiesto;
 
             // Crear o actualizar manifiesto
@@ -57,11 +63,19 @@ class FetchRndcManifiestos extends Command
                 ]
             );
 
+            $this->info('Manifiesto guardado/actualizado: ID ' . $manifiesto->id);
+
             // Limpiar puntos de control anteriores
             $manifiesto->puntosControl()->delete();
 
+            $this->info('Puntos de control anteriores eliminados.');
+
             if (isset($doc->puntoscontrol->puntocontrol)) {
+                $this->info('Agregando puntos de control...');
+
                 foreach ($doc->puntoscontrol->puntocontrol as $pc) {
+                    $this->info('  - Agregando punto de control: ' . (string) $pc->codpuntocontrol);
+
                     RndcPuntoControl::create([
                         'rndc_manifiesto_id' => $manifiesto->id,
                         'codpuntocontrol'    => (int) $pc->codpuntocontrol,
@@ -73,8 +87,14 @@ class FetchRndcManifiestos extends Command
                         'longitud'           => (string) $pc->longitud !== '' ? (float) $pc->longitud : null,
                         'tiempopactado'      => (int) $pc->tiempopactado,
                     ]);
+
+                    $this->info('    Punto de control guardado.');
                 }
+
+                $this->info('Puntos de control agregados.');
             }
+
+            $this->info('Manifiesto ID ' . $ingresoId . ' procesado correctamente.');
 
             $procesados++;
         }
