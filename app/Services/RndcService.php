@@ -95,8 +95,11 @@ class RndcService
 
         } catch (\SoapFault $e) {
             logger()->error('Error SOAP AtenderMensajeRNDC', [
-                'code'   => $e->faultcode ?? null,
-                'string' => $e->faultstring ?? $e->getMessage(),
+                'code'      => $e->faultcode ?? null,
+                'string'    => $e->faultstring ?? $e->getMessage(),
+                'request'   => isset($client) ? $client->__getLastRequest() : null,
+                'response'  => isset($client) ? $client->__getLastResponse() : null,
+                'headers'   => isset($client) ? $client->__getLastResponseHeaders() : null,
             ]);
 
             throw new \Exception(
@@ -303,8 +306,11 @@ class RndcService
 
         } catch (\SoapFault $e) {
             logger()->error('Error SOAP evento RNDC', [
-                'code'   => $e->faultcode ?? null,
-                'string' => $e->faultstring ?? $e->getMessage(),
+                'code'      => $e->faultcode ?? null,
+                'string'    => $e->faultstring ?? $e->getMessage(),
+                'request'   => isset($client) ? $client->__getLastRequest() : null,
+                'response'  => isset($client) ? $client->__getLastResponse() : null,
+                'headers'   => isset($client) ? $client->__getLastResponseHeaders() : null,
             ]);
 
             throw new \Exception(
