@@ -56,7 +56,7 @@ class RndcManifiestoController extends Controller
             } catch (\Exception $e) {}
         });
 
-        $query->orderBy('proxima_fechacita')
+        $query->orderBy('proxima_fechacita', 'desc')
             ->orderByDesc('rndc_manifiestos.fechaexpedicionmanifiesto')
             ->orderByDesc('rndc_manifiestos.id');
 
