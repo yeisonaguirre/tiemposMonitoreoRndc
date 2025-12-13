@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Cache;
+use App\Http\Controllers\ManifiestosProcesadosController;
 use App\Http\Controllers\RndcManifiestoController;
 
 /*
@@ -18,6 +19,9 @@ use App\Http\Controllers\RndcManifiestoController;
 Route::get('/', function () {
     return redirect()->route('rndc.manifiestos.index');
 });
+
+Route::get('rndc/manifiestos/procesados', [ManifiestosProcesadosController::class, 'index'])
+    ->name('rndc.manifiestos.procesados.index');
 
 Route::get('/rndc/manifiestos', [RndcManifiestoController::class, 'index'])
     ->name('rndc.manifiestos.index');

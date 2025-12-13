@@ -40,7 +40,6 @@
     @stack('styles')
 </head>
 <body>
-
     {{-- Navbar --}}
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container-fluid">
@@ -58,19 +57,22 @@
 
                 <ul class="navbar-nav ms-auto">
 
+                    {{-- Pendientes --}}
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ route('rndc.manifiestos.index') }}">
-                            Manifiestos
+                        <a class="nav-link {{ request()->routeIs('rndc.manifiestos.index') ? 'active fw-semibold' : '' }}"
+                        href="{{ route('rndc.manifiestos.index') }}">
+                            Pendientes
                         </a>
                     </li>
 
-                    {{-- Si luego quieres reportes u otras vistas
+                    {{-- Procesados / Histórico --}}
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ route('rndc.reportes') }}">
-                            Reportes
+                        <a class="nav-link {{ request()->routeIs('rndc.manifiestos.procesados.*') ? 'active fw-semibold' : '' }}"
+                        href="{{ route('rndc.manifiestos.procesados.index') }}">
+                            Procesados
                         </a>
                     </li>
-                    --}}
+
                 </ul>
 
             </div>
