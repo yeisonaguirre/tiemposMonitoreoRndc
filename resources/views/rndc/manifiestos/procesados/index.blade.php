@@ -63,17 +63,17 @@
                 <tbody>
                 @forelse($manifiestos as $m)
                     <tr>
-                        <td>
+                        <td data-label="Manifiesto">
                             <a class="text-decoration-none" href="{{ route('rndc.manifiestos.show', $m) }}">
                                 {{ $m->nummanifiestocarga }}
                             </a>
                             <div class="small text-muted">Ingreso: {{ $m->ingresoidmanifiesto }}</div>
                         </td>
-                        <td><span class="badge text-bg-light">{{ $m->numplaca }}</span></td>
-                        <td><span class="badge text-bg-secondary">{{ $m->codigoempresa }}</span></td>
-                        <td>{{ $m->ultima_fecha_evento ? \Carbon\Carbon::parse($m->ultima_fecha_evento)->format('d/m/Y H:i') : '—' }}</td>
+                        <td data-label="Placa"><span class="badge text-bg-light">{{ $m->numplaca }}</span></td>
+                        <td data-label="Empresa"><span class="badge text-bg-secondary">{{ $m->codigoempresa }}</span></td>
+                        <td data-label="Último envío">{{ $m->ultima_fecha_evento ? \Carbon\Carbon::parse($m->ultima_fecha_evento)->format('d/m/Y H:i') : '—' }}</td>
 
-                        <td>
+                        <td data-label="Log puntos finalizados">
                             <div style="max-height: 220px; overflow:auto; padding-right:.25rem;">
                                 @foreach($m->puntosControl as $pc)
                                     <div class="border rounded-3 p-2 mb-2 bg-white">

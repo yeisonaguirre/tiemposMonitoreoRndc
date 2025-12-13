@@ -92,23 +92,23 @@
                     <tbody>
                     @forelse ($manifiestos as $m)
                         <tr>
-                            <td>
+                            <td data-label="Ingreso ID">
                                 <a class="text-decoration-none" href="{{ route('rndc.manifiestos.show', $m) }}">
                                     {{ $m->ingresoidmanifiesto }}
                                 </a>
                             </td>
 
-                            <td>
+                            <td data-label="Manifiesto">
                                 <a class="text-decoration-none" href="{{ route('rndc.manifiestos.show', $m) }}">
                                     {{ $m->nummanifiestocarga }}
                                 </a>
                             </td>
 
-                            <td><span class="badge text-bg-light">{{ $m->numplaca }}</span></td>
-                            <td>{{ optional($m->fechaexpedicionmanifiesto)->format('d/m/Y') }}</td>
-                            <td><span class="badge text-bg-secondary">{{ $m->codigoempresa }}</span></td>
+                            <td data-label="Placa"><span class="badge text-bg-light">{{ $m->numplaca }}</span></td>
+                            <td data-label="Fecha Exp.">{{ optional($m->fechaexpedicionmanifiesto)->format('d/m/Y') }}</td>
+                            <td data-label="Empresa"><span class="badge text-bg-secondary">{{ $m->codigoempresa }}</span></td>
 
-                            <td>
+                            <td data-label="Puntos de Control / Evento">
                                 {{-- ✅ Limitar altura y hacer scroll interno si hay muchos puntos --}}
                                 <div class="rndc-puntos-wrap">
                                     @forelse ($m->puntosControl as $pc)
