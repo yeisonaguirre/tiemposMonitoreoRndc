@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\RndcPuntoControl;
 use App\Services\RndcService;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class RndcManifiestoController extends Controller
 {
@@ -14,55 +15,52 @@ class RndcManifiestoController extends Controller
     {
         $query = RndcManifiesto::query()
             ->select('rndc_manifiestos.*')
-            ->leftJoin('rndc_puntos_control AS pc', function ($join) {
-                $join->on('pc.rndc_manifiesto_id', '=', 'rndc_manifiestos.id')
-                    ->where('pc.finalizado', false);
-            })
+            ->addSelect([
+                'proxima_fechacita' => DB::table('rndc_puntos_control')
+                    ->selectRaw('MIN(fechacita)')
+                    ->whereColumn('rndc_puntos_control.rndc_manifiesto_id', 'rndc_manifiestos.id')
+                    ->where('finalizado', false),
+            ])
             ->with(['puntosControl' => function ($q) {
                 $q->where('finalizado', false)
-                ->orderBy('fechacita'); // orden interno de puntos de control
+                ->orderBy('fechacita');
             }])
             ->whereExists(function ($q) {
                 $q->selectRaw(1)
-                    ->from('rndc_puntos_control')
-                    ->whereColumn('rndc_manifiestos.id', 'rndc_puntos_control.rndc_manifiesto_id')
-                    ->where('rndc_puntos_control.finalizado', false);
+                ->from('rndc_puntos_control')
+                ->whereColumn('rndc_manifiestos.id', 'rndc_puntos_control.rndc_manifiesto_id')
+                ->where('rndc_puntos_control.finalizado', false);
             });
 
         // 🔍 Filtros
-        $query->when($request->filled('ingresoidmanifiesto'), function ($q) use ($request) {
-            $q->where('rndc_manifiestos.ingresoidmanifiesto', 'like', '%'.$request->ingresoidmanifiesto.'%');
-        });
+        $query->when($request->filled('ingresoidmanifiesto'), fn($q) =>
+            $q->where('rndc_manifiestos.ingresoidmanifiesto', 'like', '%'.$request->ingresoidmanifiesto.'%')
+        );
 
-        $query->when($request->filled('nummanifiestocarga'), function ($q) use ($request) {
-            $q->where('rndc_manifiestos.nummanifiestocarga', 'like', '%'.$request->nummanifiestocarga.'%');
-        });
+        $query->when($request->filled('nummanifiestocarga'), fn($q) =>
+            $q->where('rndc_manifiestos.nummanifiestocarga', 'like', '%'.$request->nummanifiestocarga.'%')
+        );
 
-        $query->when($request->filled('numplaca'), function ($q) use ($request) {
-            $q->where('rndc_manifiestos.numplaca', 'like', '%'.$request->numplaca.'%');
-        });
+        $query->when($request->filled('numplaca'), fn($q) =>
+            $q->where('rndc_manifiestos.numplaca', 'like', '%'.$request->numplaca.'%')
+        );
 
-        $query->when($request->filled('codigoempresa'), function ($q) use ($request) {
-            $q->where('rndc_manifiestos.codigoempresa', 'like', '%'.$request->codigoempresa.'%');
-        });
+        $query->when($request->filled('codigoempresa'), fn($q) =>
+            $q->where('rndc_manifiestos.codigoempresa', 'like', '%'.$request->codigoempresa.'%')
+        );
 
-        // Filtro por fecha de expedición (formato d/m/Y)
         $query->when($request->filled('fechaexpedicion'), function ($q) use ($request) {
             try {
-                $fecha = Carbon::createFromFormat('d/m/Y', $request->fechaexpedicion)->format('Y-m-d');
+                $fecha = \Carbon\Carbon::createFromFormat('d/m/Y', $request->fechaexpedicion)->format('Y-m-d');
                 $q->whereDate('rndc_manifiestos.fechaexpedicionmanifiesto', $fecha);
-            } catch (\Exception $e) {
-                // si la fecha viene mal, simplemente no filtramos
-            }
+            } catch (\Exception $e) {}
         });
 
-        // Orden
-        $query
-            ->orderByDesc('rndc_manifiestos.fechaexpedicionmanifiesto', 'desc')
-            ->orderBy('pc.fechacita') // orden principal por fecha cita del punto no finalizado
+        $query->orderBy('proxima_fechacita')
+            ->orderByDesc('rndc_manifiestos.fechaexpedicionmanifiesto')
             ->orderByDesc('rndc_manifiestos.id');
 
-        $manifiestos = $query->paginate(20)->appends($request->query());
+        $manifiestos = $query->paginate(40)->appends($request->query());
 
         return view('rndc.manifiestos.index', compact('manifiestos'));
     }
