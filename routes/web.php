@@ -38,6 +38,9 @@ Route::post('/rndc/manifiestos/{manifiesto}/puntos/{punto}/evento', [RndcManifie
 Route::post('/rndc/manifiestos/sync', [RndcManifiestoController::class, 'sync'])
     ->name('rndc.manifiestos.sync');
 
+Route::post('/rndc/manifiestos/sync-by-manifiesto', [RndcManifiestoController::class, 'syncByManifiesto'])
+    ->name('rndc.manifiestos.sync_by_manifiesto');
+
 Route::get('/rndc/debug/last-response', function () {
     return response(Cache::get('rndc:last_response_xml', 'Sin datos'), 200, [
         'Content-Type' => 'application/xml',

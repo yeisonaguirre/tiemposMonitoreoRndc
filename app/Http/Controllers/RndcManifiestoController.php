@@ -90,6 +90,26 @@ class RndcManifiestoController extends Controller
 
         return back()->with('warning', 'No se encontraron nuevos manifiestos o hubo un error en la consulta.');
     }
+    
+    public function syncByManifiesto(Request $request, RndcService $service)
+    {
+        $data = $request->validate([
+            'nummanifiestocarga' => ['required', 'string', 'max:30'],
+            'autorizacion'       => ['required', 'string', 'max:40'],
+        ]);
+
+        try {
+            $count = $service->syncManifiestosDesdeWebService($data['autorizacion']);
+        } catch (\Exception $e) {
+            return back()->with('error', 'Error al consultar manifiesto: ' . $e->getMessage());
+        }
+
+        if ($count > 0) {
+            return back()->with('success', "Manifiesto {$data['nummanifiestocarga']} actualizado ({$count}).");
+        }
+
+        return back()->with('warning', 'No se encontró el manifiesto o no hubo cambios.');
+    }
 
     public function crearEvento(RndcManifiesto $manifiesto, RndcPuntoControl $punto)
     {

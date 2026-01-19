@@ -7,12 +7,55 @@
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
         <h1 class="h4 m-0">Man.RNDC</h1>
 
-        <form method="POST" action="{{ route('rndc.manifiestos.sync') }}">
-            @csrf
-            <button type="submit" class="btn btn-sm btn-primary">
-                🔄 Consultar nuevos
+        <div class="d-flex gap-2">
+            <form method="POST" action="{{ route('rndc.manifiestos.sync') }}">
+                @csrf
+                <button type="submit" class="btn btn-sm btn-primary">
+                    🔄 Consultar nuevos
+                </button>
+            </form>
+
+            {{-- NUEVO: buscar por manifiesto/autorización --}}
+            <button type="button" class="btn btn-sm btn-outline-primary"
+                    data-bs-toggle="modal" data-bs-target="#modalBuscarManifiesto">
+                🔎 Buscar manifiesto
             </button>
-        </form>
+        </div>
+
+        {{-- Modal --}}
+        <div class="modal fade" id="modalBuscarManifiesto" tabindex="-1" aria-labelledby="modalBuscarManifiestoLabel" aria-hidden="true">
+            <div class="modal-dialog modal-sm modal-dialog-centered">
+                <div class="modal-content">
+                <form method="POST" action="{{ route('rndc.manifiestos.sync_by_manifiesto') }}">
+                    @csrf
+
+                    <div class="modal-header">
+                    <h5 class="modal-title" id="modalBuscarManifiestoLabel">Buscar manifiesto RNDC</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                    </div>
+
+                    <div class="modal-body">
+                    <div class="mb-2">
+                        <label class="form-label form-label-sm">Nro Manifiesto</label>
+                        <input type="text" name="nummanifiestocarga" class="form-control form-control-sm"
+                            placeholder="Ej: 123456789" required>
+                    </div>
+
+                    <div class="mb-0">
+                        <label class="form-label form-label-sm">Nro Autorización</label>
+                        <input type="text" name="autorizacion" class="form-control form-control-sm"
+                            placeholder="Ej: 987654321" required>
+                    </div>
+                    </div>
+
+                    <div class="modal-footer">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-sm btn-primary">🔄 Consultar</button>
+                    </div>
+                </form>
+                </div>
+            </div>
+        </div>
     </div>
 
     {{-- ✅ Filtros en grid responsive --}}

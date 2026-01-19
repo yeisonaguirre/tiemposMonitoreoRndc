@@ -14,12 +14,17 @@ class RndcService
     /**
      * Consulta el webservice real y devuelve el XML parseado
      */
-    public function consultarManifiestos(): ?SimpleXMLElement
+    public function consultarManifiestos(?string $ingresoIdManifiesto = null): ?SimpleXMLElement
     {
         $url    = config('services.rndc.url');
         $user   = config('services.rndc.user');
         $pass   = config('services.rndc.pass');
         $nitgps = config('services.rndc.nitgps');
+
+        $ingresoIdManifiesto = $ingresoIdManifiesto ? trim($ingresoIdManifiesto) : null;
+        $documentoNodo = $ingresoIdManifiesto
+            ? "<ingresoidmanifiesto>{$this->xmlEscape($ingresoIdManifiesto)}</ingresoidmanifiesto>"
+            : "<manifiestos>nuevos</manifiestos>";
 
         $xmlRequest = <<<XML
             <?xml version='1.0' encoding='ISO-8859-1'?>
@@ -34,7 +39,7 @@ class RndcService
             </solicitud>
             <documento>
                 <numidgps>{$nitgps}</numidgps>
-                <manifiestos>nuevos</manifiestos>
+                {$documentoNodo}
             </documento>
             </root>
             XML;
@@ -106,6 +111,14 @@ class RndcService
                 'Error de comunicación con RNDC: ' . ($e->faultstring ?? $e->getMessage())
             );
         }
+    }
+
+    /**
+     * Escapa valores para XML (evita romper el XML si hay &, <, etc.)
+     */
+    private function xmlEscape(?string $value): string
+    {
+        return htmlspecialchars($value ?? '', ENT_XML1 | ENT_QUOTES, 'ISO-8859-1');
     }
 
     /**
@@ -322,10 +335,10 @@ class RndcService
     /**
      * Helper para usar el WS real y guardar todo en BD en un solo paso
      */
-    public function syncManifiestosDesdeWebService(): int
+    public function syncManifiestosDesdeWebService(?string $ingresoIdManifiesto = null): int
     {
         try {
-            $xml = $this->consultarManifiestos(); // ahora viene desde SOAP
+            $xml = $this->consultarManifiestos($ingresoIdManifiesto); // ahora viene desde SOAP
 
             if (!$xml) {
                 return 0;
