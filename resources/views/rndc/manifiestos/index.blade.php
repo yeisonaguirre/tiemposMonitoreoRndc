@@ -83,8 +83,8 @@
 
                     <div class="col-12 col-md-2 col-lg-2">
                         <label class="form-label form-label-sm mb-1">Empresa</label>
-                        <input type="text" name="codigoempresa" class="form-control form-control-sm"
-                               value="{{ request('codigoempresa') }}" placeholder="Empresa">
+                        <input type="text" name="numnitempresatransporte" class="form-control form-control-sm"
+                               value="{{ request('numnitempresatransporte') }}" placeholder="Empresa">
                     </div>
 
                     <div class="col-12 col-md-2 col-lg-2">
@@ -149,7 +149,7 @@
 
                             <td data-label="Placa"><span class="badge text-bg-light">{{ $m->numplaca }}</span></td>
                             <td data-label="Fecha Exp.">{{ optional($m->fechaexpedicionmanifiesto)->format('d/m/Y') }}</td>
-                            <td data-label="Empresa"><span class="badge text-bg-secondary">{{ $m->codigoempresa }}</span></td>
+                            <td data-label="Empresa"><span class="badge text-bg-secondary">{{ $m->numnitempresatransporte }} {{ $m->codigoempresa }}</span></td>
 
                             <td data-label="Puntos de Control / Evento">
                                 {{-- ✅ Limitar altura y hacer scroll interno si hay muchos puntos --}}

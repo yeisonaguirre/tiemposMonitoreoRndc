@@ -45,8 +45,8 @@ class RndcManifiestoController extends Controller
             $q->where('rndc_manifiestos.numplaca', 'like', '%'.$request->numplaca.'%')
         );
 
-        $query->when($request->filled('codigoempresa'), fn($q) =>
-            $q->where('rndc_manifiestos.codigoempresa', 'like', '%'.$request->codigoempresa.'%')
+        $query->when($request->filled('numnitempresatransporte'), fn($q) =>
+            $q->where('rndc_manifiestos.numnitempresatransporte', 'like', '%'.$request->numnitempresatransporte.'%')
         );
 
         $query->when($request->filled('fechaexpedicion'), function ($q) use ($request) {
