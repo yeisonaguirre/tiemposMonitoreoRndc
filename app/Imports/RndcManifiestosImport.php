@@ -2,17 +2,18 @@
 
 namespace App\Imports;
 
+use App\Models\RndcManifiesto;
 use App\Services\RndcService;
-use Illuminate\Support\Str;
+use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
-use Illuminate\Support\Collection;
 
 class RndcManifiestosImport implements ToCollection, WithHeadingRow
 {
     private int $ok = 0;
     private int $fail = 0;
     private int $total = 0;
+    private int $skipped = 0; // ya existían
 
     public function __construct(private readonly RndcService $service) {}
 
@@ -21,27 +22,38 @@ class RndcManifiestosImport implements ToCollection, WithHeadingRow
         foreach ($rows as $row) {
             $this->total++;
 
-            // Soporta encabezados: manifiesto/autorizacion
-            // Si tu excel viene sin encabezados, dime y lo adapto a índices [0],[1]
-            $manifiesto   = trim((string)($row['manifiesto'] ?? $row['nro_manifiesto'] ?? $row['nummanifiestocarga'] ?? ''));
+            $manifiesto = trim((string)($row['manifiesto'] ?? $row['nro_manifiesto'] ?? $row['nummanifiestocarga'] ?? ''));
             $autorizacion = trim((string)($row['autorizacion'] ?? $row['ingresoidmanifiesto'] ?? ''));
-            
+
             if ($manifiesto === '' || $autorizacion === '') {
                 $this->fail++;
                 continue;
             }
 
-            // Normalización (opcional)
+            // Normaliza (por si vienen con espacios)
             $manifiesto   = preg_replace('/\s+/', '', $manifiesto);
             $autorizacion = preg_replace('/\s+/', '', $autorizacion);
 
+            // ✅ VALIDAR SI YA EXISTE (manifiesto + autorización)
+            $yaExiste = RndcManifiesto::query()
+                ->where('nummanifiestocarga', $manifiesto)
+                ->where('ingresoidmanifiesto', $autorizacion)
+                ->exists();
+
+            if ($yaExiste) {
+                $this->skipped++;
+                continue;
+            }
+
             try {
                 $count = $this->service->syncManifiestosDesdeWebService($autorizacion);
+
                 if ($count > 0) $this->ok++;
                 else $this->fail++;
+
             } catch (\Throwable $e) {
                 $this->fail++;
-                // Si quieres log por fila:
+
                 logger()->warning('Import RNDC fila fallida', [
                     'manifiesto' => $manifiesto,
                     'autorizacion' => $autorizacion,
@@ -56,6 +68,7 @@ class RndcManifiestosImport implements ToCollection, WithHeadingRow
         return [
             'ok' => $this->ok,
             'fail' => $this->fail,
+            'skipped' => $this->skipped,
             'total' => $this->total,
         ];
     }

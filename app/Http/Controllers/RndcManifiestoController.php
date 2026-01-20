@@ -124,11 +124,10 @@ class RndcManifiestoController extends Controller
 
             $r = $import->result();
 
-            if (($r['ok'] ?? 0) > 0) {
-                return back()->with('success', "Importación lista. OK: {$r['ok']} | Fallidas: {$r['fail']} | Total: {$r['total']}");
-            }
-
-            return back()->with('warning', "Importación finalizada. No se procesó ninguna fila válida. Fallidas: {$r['fail']} | Total: {$r['total']}");
+            return back()->with(
+                ($r['ok'] ?? 0) > 0 ? 'success' : 'warning',
+                "Importación lista. OK: {$r['ok']} | Omitidas (ya existen): {$r['skipped']} | Fallidas: {$r['fail']} | Total: {$r['total']}"
+            );
         } catch (\Throwable $e) {
             return back()->with('error', 'Error al importar Excel: ' . $e->getMessage());
         }
