@@ -15,14 +15,49 @@
                 </button>
             </form>
 
-            {{-- NUEVO: buscar por manifiesto/autorización --}}
             <button type="button" class="btn btn-sm btn-outline-primary"
                     data-bs-toggle="modal" data-bs-target="#modalBuscarManifiesto">
                 🔎 Buscar manifiesto
             </button>
+
+            <button type="button" class="btn btn-sm btn-outline-success"
+                    data-bs-toggle="modal" data-bs-target="#modalImportExcel">
+                📥 Importar Excel
+            </button>
         </div>
 
         {{-- Modal --}}
+        <div class="modal fade" id="modalImportExcel" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-sm modal-dialog-centered">
+                <div class="modal-content">
+                <form method="POST" action="{{ route('rndc.manifiestos.import_excel') }}" enctype="multipart/form-data">
+                    @csrf
+                    <div class="modal-header">
+                    <h5 class="modal-title">Importar Excel</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+
+                    <div class="modal-body">
+                    <div class="mb-2">
+                        <label class="form-label form-label-sm">Archivo (.xlsx)</label>
+                        <input type="file" name="archivo" class="form-control form-control-sm"
+                            accept=".xlsx,.xls" required>
+                        <div class="form-text">
+                        Columnas: <b>manifiesto</b> y <b>autorizacion</b>
+                        (o en ese orden).
+                        </div>
+                    </div>
+                    </div>
+
+                    <div class="modal-footer">
+                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancelar</button>
+                    <button class="btn btn-sm btn-success" type="submit">Procesar</button>
+                    </div>
+                </form>
+                </div>
+            </div>
+            </div>
+
         <div class="modal fade" id="modalBuscarManifiesto" tabindex="-1" aria-labelledby="modalBuscarManifiestoLabel" aria-hidden="true">
             <div class="modal-dialog modal-sm modal-dialog-centered">
                 <div class="modal-content">

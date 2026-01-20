@@ -8,6 +8,7 @@ use App\Models\RndcPuntoControl;
 use App\Services\RndcService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Facades\Excel;
 
 class RndcManifiestoController extends Controller
 {
@@ -109,6 +110,28 @@ class RndcManifiestoController extends Controller
         }
 
         return back()->with('warning', 'No se encontró el manifiesto o no hubo cambios.');
+    }
+
+    public function importExcel(Request $request, RndcService $service)
+    {
+        $request->validate([
+            'archivo' => ['required', 'file', 'mimes:xlsx,xls', 'max:5120'], // 5MB
+        ]);
+
+        try {
+            $import = new \App\Imports\RndcManifiestosImport($service);
+            Excel::import($import, $request->file('archivo'));
+
+            $r = $import->result();
+
+            if (($r['ok'] ?? 0) > 0) {
+                return back()->with('success', "Importación lista. OK: {$r['ok']} | Fallidas: {$r['fail']} | Total: {$r['total']}");
+            }
+
+            return back()->with('warning', "Importación finalizada. No se procesó ninguna fila válida. Fallidas: {$r['fail']} | Total: {$r['total']}");
+        } catch (\Throwable $e) {
+            return back()->with('error', 'Error al importar Excel: ' . $e->getMessage());
+        }
     }
 
     public function crearEvento(RndcManifiesto $manifiesto, RndcPuntoControl $punto)
