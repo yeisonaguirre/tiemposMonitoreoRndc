@@ -52,6 +52,7 @@
                     <div class="modal-footer">
                     <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancelar</button>
                     <button class="btn btn-sm btn-success" type="submit">Procesar</button>
+                    <input type="hidden" name="_modal" value="importar">
                     </div>
                 </form>
                 </div>
@@ -86,6 +87,7 @@
                     <div class="modal-footer">
                     <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button type="submit" class="btn btn-sm btn-primary">🔄 Consultar</button>
+                    <input type="hidden" name="_modal" value="buscar">
                     </div>
                 </form>
                 </div>
@@ -263,5 +265,22 @@
   }
 </style>
 @endpush
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    @if ($errors->any())
+        const modalName = @json(old('_modal'));
+        if (modalName === 'buscar') {
+            new bootstrap.Modal(document.getElementById('modalBuscarManifiesto')).show();
+        }
+        if (modalName === 'importar') {
+            new bootstrap.Modal(document.getElementById('modalImportExcel')).show();
+        }
+    @endif
+});
+</script>
+@endpush
+
 
 @endsection
