@@ -8,6 +8,7 @@ use App\Models\RndcPuntoControl;
 use App\Services\RndcService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Facades\Excel;
 
 class RndcManifiestoController extends Controller
@@ -115,7 +116,7 @@ class RndcManifiestoController extends Controller
     public function importExcel(Request $request, RndcService $service)
     {
         $request->validate([
-            'archivo' => ['required', 'file', 'mimes:xlsx,xls', 'max:5120'], // 5MB
+            'archivo' => ['required', 'file', 'mimes:xlsx,xls', 'max:5120'],
         ]);
 
         try {
@@ -124,13 +125,59 @@ class RndcManifiestoController extends Controller
 
             $r = $import->result();
 
-            return back()->with(
-                ($r['ok'] ?? 0) > 0 ? 'success' : 'warning',
-                "Importación lista. OK: {$r['ok']} | Omitidas (ya existen): {$r['skipped']} | Fallidas: {$r['fail']} | Total: {$r['total']}"
-            );
+            // ✅ Generar CSV con detalle completo (para descargar)
+            $filename = 'rndc_import_result_' . now()->format('Ymd_His') . '.csv';
+            $path = 'rndc_imports/' . $filename;
+
+            Storage::disk('local')->put($path, $this->toCsv($r['details'] ?? []));
+
+            return back()
+                ->with(($r['ok'] ?? 0) > 0 ? 'success' : 'warning',
+                    "Importación lista. OK: {$r['ok']} | Omitidas: {$r['skipped']} | Fallidas: {$r['fail']} | Total: {$r['total']}"
+                )
+                ->with('import_details', array_slice($r['details'] ?? [], 0, 50)) // muestra top 50
+                ->with('import_csv', $path); // ruta para descargar
+
         } catch (\Throwable $e) {
             return back()->with('error', 'Error al importar Excel: ' . $e->getMessage());
         }
+    }
+
+    private function toCsv(array $rows): string
+    {
+        $out = fopen('php://temp', 'r+');
+
+        fputcsv($out, ['fila', 'manifiesto', 'autorizacion', 'estado', 'mensaje']);
+
+        foreach ($rows as $r) {
+            fputcsv($out, [
+                $r['fila'] ?? '',
+                $r['manifiesto'] ?? '',
+                $r['autorizacion'] ?? '',
+                $r['estado'] ?? '',
+                $r['mensaje'] ?? '',
+            ]);
+        }
+
+        rewind($out);
+        return stream_get_contents($out) ?: '';
+    }
+
+    public function downloadImportResult(Request $request)
+    {
+        $path = $request->query('path');
+
+        if (!$path || !Storage::disk('local')->exists($path)) {
+            abort(404, 'Archivo no encontrado');
+        }
+
+        return response()->download(
+            storage_path('app/' . $path),
+            basename($path),
+            [
+                'Content-Type' => 'text/csv',
+            ]
+        );
     }
 
     public function crearEvento(RndcManifiesto $manifiesto, RndcPuntoControl $punto)

@@ -44,6 +44,9 @@ Route::post('/rndc/manifiestos/sync-by-manifiesto', [RndcManifiestoController::c
 Route::post('/rndc/manifiestos/import-excel', [RndcManifiestoController::class, 'importExcel'])
     ->name('rndc.manifiestos.import_excel');
 
+Route::get('/rndc/manifiestos/import-result', [RndcManifiestoController::class, 'downloadImportResult'])
+    ->name('rndc.manifiestos.import_result');
+
 Route::get('/rndc/debug/last-response', function () {
     return response(Cache::get('rndc:last_response_xml', 'Sin datos'), 200, [
         'Content-Type' => 'application/xml',
