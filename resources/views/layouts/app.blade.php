@@ -109,6 +109,58 @@
             </div>
         @endif
 
+        @if(session('import_csv'))
+            <div class="mb-2">
+                <a class="btn btn-sm btn-outline-dark"
+                href="{{ route('rndc.manifiestos.import_result', ['path' => session('import_csv')]) }}">
+                    ⬇️ Descargar resultado CSV
+                </a>
+            </div>
+        @endif
+
+        @if(session('import_details'))
+            <div class="card mb-3">
+                <div class="card-header py-2">
+                    <strong>Detalle importación (primeras {{ count(session('import_details')) }} filas)</strong>
+                    <div class="text-muted small">Descarga el CSV para ver todo.</div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Fila</th>
+                                    <th>Manifiesto</th>
+                                    <th>Autorización</th>
+                                    <th>Estado</th>
+                                    <th>Mensaje</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            @foreach(session('import_details') as $d)
+                                <tr>
+                                    <td>{{ $d['fila'] }}</td>
+                                    <td>{{ $d['manifiesto'] }}</td>
+                                    <td>{{ $d['autorizacion'] }}</td>
+                                    <td>
+                                        @if($d['estado'] === 'ok')
+                                            <span class="badge text-bg-success">OK</span>
+                                        @elseif($d['estado'] === 'skipped')
+                                            <span class="badge text-bg-secondary">Omitido</span>
+                                        @else
+                                            <span class="badge text-bg-danger">Falló</span>
+                                        @endif
+                                    </td>
+                                    <td class="small">{{ $d['mensaje'] }}</td>
+                                </tr>
+                            @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        @endif
+
         {{-- Errores de validación --}}
         @if ($errors->any())
             <div class="alert alert-danger">
