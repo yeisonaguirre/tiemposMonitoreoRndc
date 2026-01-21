@@ -135,7 +135,7 @@ class RndcManifiestoController extends Controller
                 ->with(($r['ok'] ?? 0) > 0 ? 'success' : 'warning',
                     "Importación lista. OK: {$r['ok']} | Omitidas: {$r['skipped']} | Fallidas: {$r['fail']} | Total: {$r['total']}"
                 )
-                ->with('import_details', array_slice($r['details'] ?? [], 0, 50)) // muestra top 50
+                ->with('import_details', array_slice($r['details'] ?? [], 0, count($r['details'] ?? 50), true))
                 ->with('import_csv', $path); // ruta para descargar
 
         } catch (\Throwable $e) {
