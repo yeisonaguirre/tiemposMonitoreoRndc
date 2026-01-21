@@ -11,6 +11,100 @@ use Illuminate\Support\Facades\Cache;
 
 class RndcService
 {
+    public function consultarTodosManifiestos(): ?SimpleXMLElement
+    {
+        $url    = config('services.rndc.url');
+        $user   = config('services.rndc.user');
+        $pass   = config('services.rndc.pass');
+        $nitgps = config('services.rndc.nitgps');
+
+        $xmlRequest = <<<XML
+            <?xml version='1.0' encoding='ISO-8859-1'?>
+            <root>
+            <acceso>
+                <username>{$user}</username>
+                <password>{$pass}</password>
+            </acceso>
+            <solicitud>
+                <tipo>9</tipo>
+                <procesoid>4</procesoid>
+            </solicitud>
+            <documento>
+                <numidgps>{$nitgps}</numidgps>
+                <manifiestos>todos</manifiestos>
+            </documento>
+            </root>
+            XML;
+
+        try {
+            $client = new \SoapClient($url, [
+                'trace'              => true,
+                'exceptions'         => true,
+                'cache_wsdl'         => WSDL_CACHE_NONE,
+                'connection_timeout' => 30, // antes 10
+                'stream_context'     => stream_context_create([
+                    'http' => [
+                        'timeout' => 60,   // tiempo máximo para leer respuesta
+                    ],
+                ]),
+            ]);
+
+            $sendSoap = $client->AtenderMensajeRNDC($xmlRequest);
+
+            if (is_string($sendSoap)) {
+                $rawResponse = $sendSoap;
+            } elseif (is_object($sendSoap) && isset($sendSoap->return)) {
+                $rawResponse = $sendSoap->return;
+            } else {
+                logger()->error('Respuesta RNDC inesperada', ['resp' => $sendSoap]);
+                return null;
+            }
+
+            // 👉 Guardar SIEMPRE la última respuesta en cache
+            Cache::put(
+                'rndc:last_todos_manifiestos_xml',
+                trim($rawResponse) !== '' ? $rawResponse : '<root><Error>No hay XML válido</Error></root>',
+                now()->addMinutes(180)//3 horas
+            );
+
+            // 4. Parsear la respuesta a XML seguro
+            $xml = $this->xmlSafeParse($rawResponse);
+
+            if ($xml === false) {
+                logger()->error('RNDC: XML inválido en respuesta', ['raw' => $rawResponse]);
+                throw new \Exception('La respuesta del RNDC no es un XML válido.');
+            }
+
+            if (isset($xml->ErrorMSG)) {
+                $mensaje = trim((string) $xml->ErrorMSG);
+
+                logger()->error('RNDC: Error recibido', [
+                    'error' => $mensaje,
+                    // Opcional: también podrías guardar aparte
+                    // 'xml'   => $rawResponse,
+                ]);
+
+                // Ya el XML quedó cacheado arriba
+                throw new \Exception('Error RNDC: ' . $mensaje);
+            }
+
+            return $xml;
+
+        } catch (\SoapFault $e) {
+            logger()->error('Error SOAP AtenderMensajeRNDC', [
+                'code'      => $e->faultcode ?? null,
+                'string'    => $e->faultstring ?? $e->getMessage(),
+                'request'   => isset($client) ? $client->__getLastRequest() : null,
+                'response'  => isset($client) ? $client->__getLastResponse() : null,
+                'headers'   => isset($client) ? $client->__getLastResponseHeaders() : null,
+            ]);
+
+            throw new \Exception(
+                'Error de comunicación con RNDC: ' . ($e->faultstring ?? $e->getMessage())
+            );
+        }
+    }
+
     /**
      * Consulta el webservice real y devuelve el XML parseado
      */

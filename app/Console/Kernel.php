@@ -15,6 +15,10 @@ class Kernel extends ConsoleKernel
         // $schedule->command('inspire')->hourly();
         $schedule->command('rndc:fetch-manifiestos')
             ->cron('*/10 * * * *');
+
+        $schedule->command('rndc:fetch-manifiestos-todos')
+            ->cron('0 */3 * * *')
+            ->withoutOverlapping();
     }
 
     /**
